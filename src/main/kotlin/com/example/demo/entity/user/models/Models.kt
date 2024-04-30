@@ -1,4 +1,4 @@
-package com.example.demo.models
+package com.example.demo.entity.user.models
 
 data class UserDto(
     val username: String,

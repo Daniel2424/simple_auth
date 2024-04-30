@@ -1,8 +1,8 @@
-package com.example.demo.service
+package com.example.demo.entity.user.service
 
-import com.example.demo.models.User
-import com.example.demo.models.UserDto
-import com.example.demo.repository.UserRepository
+import com.example.demo.entity.user.models.User
+import com.example.demo.entity.user.models.UserDto
+import com.example.demo.entity.user.repository.UserRepository
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import java.lang.RuntimeException

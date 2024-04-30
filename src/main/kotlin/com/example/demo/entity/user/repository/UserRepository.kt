@@ -1,6 +1,6 @@
-package com.example.demo.repository
+package com.example.demo.entity.user.repository
 
-import com.example.demo.models.User
+import com.example.demo.entity.user.models.User
 import org.springframework.stereotype.Repository
 
 @Repository

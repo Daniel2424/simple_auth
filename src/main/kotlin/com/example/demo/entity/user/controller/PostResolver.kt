@@ -1,4 +1,4 @@
-package com.example.demo.controller
+package com.example.demo.entity.user.controller
 
 import io.leangen.graphql.annotations.GraphQLMutation
 import io.leangen.graphql.annotations.GraphQLQuery
@@ -12,9 +12,7 @@ import java.util.*
 
 @Component
 @GraphQLApi
-class PostResolver(
-    //private val userDetailService: InMemoryUserDetailsManager,
-) {
+class PostResolver {
 
     //@PreAuthorize("hasRole('VIEWER')")
     @GraphQLQuery(name = "getPosts")
@@ -25,25 +23,6 @@ class PostResolver(
                 title = "some title",
             )
         )
-    }
-
-    @GraphQLMutation(name = "registerNewUser")
-    fun registerNewUser(username: String, password: String): Boolean {
-        //val encodedPassword = passwordEncoder().encode(password)
-        val user: UserDetails = User.withUsername(username)
-            .password(password)
-            .roles("VIEWER")
-            .build()
-        try {
-            //userDetailService.createUser(user)
-            return true
-        } catch (e: Exception) {
-            return false
-        }
-    }
-
-    fun passwordEncoder(): PasswordEncoder {
-        return NoOpPasswordEncoder.getInstance()
     }
 }
 

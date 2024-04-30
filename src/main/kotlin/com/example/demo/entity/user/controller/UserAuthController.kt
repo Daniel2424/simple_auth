@@ -1,10 +1,10 @@
-package com.example.demo.controller
+package com.example.demo.entity.user.controller
 
 import com.example.demo.config.*
-import com.example.demo.models.JwtRequest
-import com.example.demo.models.JwtResponse
-import com.example.demo.models.UserDto
-import com.example.demo.service.UserService
+import com.example.demo.entity.user.models.JwtRequest
+import com.example.demo.entity.user.models.JwtResponse
+import com.example.demo.entity.user.models.UserDto
+import com.example.demo.entity.user.service.UserService
 import io.leangen.graphql.annotations.GraphQLArgument
 import io.leangen.graphql.annotations.GraphQLMutation
 import io.leangen.graphql.spqr.spring.annotations.GraphQLApi
