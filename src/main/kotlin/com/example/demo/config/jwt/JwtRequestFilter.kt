@@ -1,4 +1,4 @@
-package com.example.demo.config
+package com.example.demo.config.jwt
 
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -28,7 +28,7 @@ class JwtRequestFilter(private val jwtUtil: JwtUtil, private val userDetailsServ
         }
 
         if (username != null && SecurityContextHolder.getContext().authentication == null) {
-            val userDetails = this.userDetailsService.loadUserByUsername(username)
+            val userDetails = userDetailsService.loadUserByUsername(username)
 
             if (jwtUtil.validateToken(jwt, userDetails)) {
                 val token = UsernamePasswordAuthenticationToken(userDetails, null, userDetails.authorities)

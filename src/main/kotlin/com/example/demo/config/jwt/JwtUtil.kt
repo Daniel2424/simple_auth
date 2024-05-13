@@ -1,10 +1,8 @@
-package com.example.demo.config
+package com.example.demo.config.jwt
 
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.SignatureAlgorithm
-import io.jsonwebtoken.impl.TextCodec
-import io.jsonwebtoken.impl.TextCodec.BASE64
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.stereotype.Component
 import java.util.*
