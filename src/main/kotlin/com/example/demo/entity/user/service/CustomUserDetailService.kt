@@ -20,7 +20,7 @@ class CustomUserDetailsService(
         return User.builder()
             .username(user.username)
             .password(user.password)
-            .authorities("VIEWER")  // Назначение базовых прав (roles)
+            .authorities(user.role)  // Назначение базовых прав (roles)
             .build()
     }
 }

@@ -1,6 +1,7 @@
 package com.example.demo.entity.canvas.service
 
 import com.amazonaws.services.s3.AmazonS3
+import com.amazonaws.services.s3.model.ListObjectsV2Request
 import com.amazonaws.services.s3.model.PutObjectResult
 import com.amazonaws.services.s3.model.S3ObjectSummary
 import com.amazonaws.util.IOUtils
@@ -10,7 +11,6 @@ import org.springframework.web.multipart.MultipartFile
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
-import java.util.stream.Collectors
 
 
 @Service
@@ -19,9 +19,12 @@ class S3Service(
 ) {
     @Value("\${bucketName}")
     private val bucketName: String? = null
+    companion object {
+        private val bucketUrl = "https://daniil-ruzhkov-diplom.storage.yandexcloud.net/"
+    }
 
-    fun saveFile(file: MultipartFile): String {
-        val originalFilename = file.originalFilename
+    fun saveFile(file: MultipartFile, destinationFolder: String): String {
+        val originalFilename = "$destinationFolder/${file.originalFilename}"
         var count = 0
         val maxTries = 3
         while (true) {
@@ -53,6 +56,19 @@ class S3Service(
     fun listAllFiles(): List<String> {
         val listObjectsV2Result = s3.listObjectsV2(bucketName)
         return listObjectsV2Result.objectSummaries.map { obj: S3ObjectSummary -> obj.key }
+    }
+
+    fun listUrlImagesInFolder(folderPrefix: String): List<String> {
+        // Добавляем слеш к префиксу, если он не оканчивается на слеш
+        val normalizedPrefix = if (folderPrefix.endsWith("/")) folderPrefix else "$folderPrefix/"
+
+        val listObjectsV2Request = ListObjectsV2Request()
+            .withBucketName(bucketName)
+            .withPrefix(normalizedPrefix)
+            .withDelimiter("/") // Опционально: Использовать делитель для ограничения списка до объектов первого уровня внутри папки
+
+        val listObjectsV2Result = s3.listObjectsV2(listObjectsV2Request)
+        return listObjectsV2Result.objectSummaries.map { obj -> "$bucketUrl${obj.key}" }
     }
 
     private fun convertMultiPartToFile(file: MultipartFile): File {

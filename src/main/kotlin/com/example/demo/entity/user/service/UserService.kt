@@ -17,12 +17,20 @@ class UserService(
             throw RuntimeException("There is an account with that login: ${userDto.username}")
         }
         val user = User(
+            firstName = userDto.firstName,
+            lastName = userDto.lastName,
+            email = userDto.email,
             username = userDto.username,
-            password = passwordEncoder.encode(userDto.password)
+            password = passwordEncoder.encode(userDto.password),
+            role = userDto.role,
         )
         return userRepository.saveUser(user)
     }
 
     fun findUserByUsername(username: String): User =
         userRepository.findByUsername(username) ?: throw RuntimeException()
+
+    fun findUserById(userId: Int): User? {
+        return userRepository.findById(userId)
+    }
 }

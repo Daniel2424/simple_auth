@@ -1,12 +1,12 @@
 package com.example.demo.entity.canvas.controller
 
 import com.example.demo.entity.canvas.service.S3Service
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
-import java.net.HttpURLConnection.HTTP_OK
 
 
 @RestController
@@ -15,17 +15,24 @@ class S3Controller(
 ) {
 
     @PostMapping("upload")
-    fun upload(@RequestParam("file") file: MultipartFile): String {
-        return s3Service.saveFile(file)
+    @CrossOrigin(origins = ["http://localhost:3000"])
+    fun upload(@RequestParam("file") file: MultipartFile, destinationFolder: String = "trash"): String {
+        return s3Service.saveFile(file, destinationFolder)
     }
 
-    @GetMapping("download/{filename}")
-    fun download(@PathVariable("filename") filename: String): ResponseEntity<ByteArray> {
+    @GetMapping("download/**")
+    @CrossOrigin(origins = ["http://localhost:3000"])
+    fun download(request: HttpServletRequest): ResponseEntity<ByteArray> {
+        val filename = extractFilePath(request)
         val headers = HttpHeaders()
         headers.add("Content-type", MediaType.ALL_VALUE)
-        headers.add("Content-Disposition", "attachment; filename=$filename")
+        headers.add("Content-Disposition", "attachment; filename=${filename.substringAfterLast("/")}")
         val bytes = s3Service.downloadFile(filename)
-        return ResponseEntity.status(HTTP_OK).headers(headers).body(bytes)
+        return ResponseEntity.ok().headers(headers).body(bytes)
+    }
+
+    private fun extractFilePath(request: HttpServletRequest): String {
+        return request.requestURI.substringAfter("/download/")
     }
 
 
@@ -35,7 +42,18 @@ class S3Controller(
     }
 
     @GetMapping("list")
+    @CrossOrigin(origins = ["http://localhost:3000"])
     fun getAllFiles(): List<String> {
         return s3Service.listAllFiles()
+    }
+
+    @GetMapping("listUrlsInFolder")
+    @CrossOrigin(origins = ["http://localhost:3000"])
+    fun getAllUrlsImagesInFolder(@RequestParam(required = false) folder: String?): List<String> {
+        return if (folder != null) {
+            s3Service.listUrlImagesInFolder(folder)
+        } else {
+            s3Service.listAllFiles()
+        }
     }
 }

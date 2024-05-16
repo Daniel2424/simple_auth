@@ -28,7 +28,6 @@ class OrderService(
 
         // TODO("Нужно на фронт что-то возвращать, а не 500 кидать")
         val reservedTrucks = truckService.reserveAvailableTruckByWarehouseId(warehouseId, tonOfPetroleumByProductType)
-            ?: throw RuntimeException("Нет фур с данного склада, заказ оформить нельзя")
         if (reservedTrucks.isEmpty()) throw RuntimeException("Нет свободных фур с данного склада, которые могли бы доставить заказ")
 
         // Подсчет общей суммы заказа

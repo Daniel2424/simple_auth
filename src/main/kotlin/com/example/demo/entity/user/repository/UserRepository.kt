@@ -13,27 +13,47 @@ class UserRepository(
 ) {
 
     fun findByUsername(userName: String?): User? {
-        return dsl.select(USERS.USERID, USERS.USERNAME, USERS.PASSWORDHASH)
+        val user = dsl.select(USERS.USERID, USERS.FIRSTNAME, USERS.LASTNAME, USERS.EMAIL, USERS.USERNAME, USERS.PASSWORDHASH, USERS.ROLE)
             .from(USERS)
             .where(USERS.USERNAME.eq(userName))
             .fetchOne()?.map {
                 User(
                     id = it[USERS.USERID],
+                    firstName = it[USERS.FIRSTNAME],
+                    lastName = it[USERS.LASTNAME],
+                    email = it[USERS.EMAIL],
                     username = it[USERS.USERNAME],
-                    password = it[USERS.PASSWORDHASH]
+                    password = it[USERS.PASSWORDHASH],
+                    role = it[USERS.ROLE]
                 )
             }
+        return user
     }
 
     fun saveUser(user: User): User {
-        val record = dsl.insertInto(USERS, USERS.USERNAME, USERS.PASSWORDHASH, USERS.EMAIL, USERS.ROLE)
-            .values(user.username, user.password, "d.ruzhkov7@gmail.com" + Random().nextInt(Integer.MAX_VALUE), "VIEWER")
-            .returning(USERS.USERID, USERS.USERNAME, USERS.EMAIL)
-            .fetchOne() ?: throw IllegalArgumentException()
+        val insertedRows = dsl.insertInto(USERS, USERS.FIRSTNAME, USERS.LASTNAME, USERS.USERNAME, USERS.PASSWORDHASH, USERS.EMAIL, USERS.ROLE)
+            .values(user.firstName, user.lastName, user.username, user.password, user.email, "VIEWER")
+            .execute()
+        if (insertedRows == 0) throw IllegalArgumentException("Не удалось создать нового пользователя")
 
-        return User(
-            id = record[USERS.USERID],
-            username = record[USERS.USERNAME]
-        )
+        return user
+    }
+
+    fun findById(userId: Int): User? {
+        val user = dsl.select(USERS.USERID, USERS.FIRSTNAME, USERS.LASTNAME, USERS.EMAIL, USERS.USERNAME, USERS.PASSWORDHASH, USERS.ROLE)
+            .from(USERS)
+            .where(USERS.USERID.eq(userId))
+            .fetchOne()?.map {
+                User(
+                    id = it[USERS.USERID],
+                    firstName = it[USERS.FIRSTNAME],
+                    lastName = it[USERS.LASTNAME],
+                    email = it[USERS.EMAIL],
+                    username = it[USERS.USERNAME],
+                    password = it[USERS.PASSWORDHASH],
+                    role = it[USERS.ROLE]
+                )
+            }
+        return user
     }
 }

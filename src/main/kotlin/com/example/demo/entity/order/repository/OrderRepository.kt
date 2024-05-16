@@ -2,12 +2,13 @@ package com.example.demo.entity.order.repository
 
 import com.example.demo.entity.order.converter.OrderConverter.convertToOrder
 import com.example.demo.entity.order.models.*
-import com.example.demo.entity.product.models.Product
+import com.example.demo.entity.product.repository.ProductRepository
 import com.example.demo.entity.productCart.models.CartItem
 import com.yourpackage.generated.Tables.*
 import org.jooq.DSLContext
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import java.lang.RuntimeException
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -17,6 +18,9 @@ import java.time.LocalDateTime
 @Repository
 class OrderRepository(
     private val dslContext: DSLContext,
+    private val productRepository: ProductRepository,
+    private val truckRepository: TruckRepository,
+    private val warehouseRepository: WarehouseRepository,
 ) {
     @Transactional
     fun createOrder(userId: Int, totalPrice: BigDecimal): Order? {
@@ -55,225 +59,92 @@ class OrderRepository(
     }
 
     @Transactional(readOnly = true)
-    fun getAllOrdersByUserId(userId: Int): List<OrderFullInfo> {
-        val result = dslContext
+    fun getOrderDetailsByOrderId(orderId: Int): OrderFullInfo? {
+        val order = dslContext
             .select()
             .from(ORDERS)
-            .innerJoin(ORDERDETAILS).on(ORDERS.ORDERID.eq(ORDERDETAILS.ORDERID))
-            .innerJoin(PRODUCTS).on(ORDERDETAILS.PRODUCTID.eq(PRODUCTS.PRODUCTID))
-            .innerJoin(LOGISTICS).on(ORDERS.ORDERID.eq(LOGISTICS.ORDER_ID))
-            .leftJoin(ORDER_TRUCKS).on(ORDERS.ORDERID.eq(ORDER_TRUCKS.ORDER_ID))
-            .leftJoin(TRUCKS).on(ORDER_TRUCKS.TRUCK_ID.eq(TRUCKS.ID))
-            .leftJoin(COURIERS).on(TRUCKS.COURIER_ID.eq(COURIERS.ID))
-            .where(ORDERS.USERID.eq(userId))
+            .where(ORDERS.ORDERID.eq(orderId))
             .fetch()
+            .map { convertToOrder(it) }
+            .firstOrNull() ?: throw RuntimeException("Нет заказа с таким id = $orderId")
 
-        val ordersMap = mutableMapOf<Int, Order>()
-        val orderDetailsMap = mutableMapOf<Int, MutableList<OrderDetails>>()
-        val logisticsMap = mutableMapOf<Int, Logistic>()
-
-        result.forEach { record ->
-            val orderId = record[ORDERS.ORDERID]
-
-            if (!ordersMap.containsKey(orderId)) {
-                val orderRecord = record.into(ORDERS)
-                val order = Order(
-                    orderId = orderRecord[ORDERS.ORDERID],
-                    userId = orderRecord[ORDERS.USERID],
-                    orderDate = orderRecord[ORDERS.ORDERDATE].toLocalDate().toString(),
-                    totalPrice = orderRecord[ORDERS.TOTALPRICE],
-                    status = OrderStatus.valueOf(orderRecord[ORDERS.STATUS])
-                )
-                ordersMap[orderId] = order
-            }
-
-            val productRecord = record.into(PRODUCTS)
-            val product = Product(
-                productId = productRecord[PRODUCTS.PRODUCTID],
-                name = productRecord[PRODUCTS.NAME],
-                description = productRecord[PRODUCTS.DESCRIPTION],
-                price = productRecord[PRODUCTS.PRICE],
-                pricePerTon = productRecord[PRODUCTS.PRICEPERTON],
-                type = productRecord[PRODUCTS.TYPE],
-                imageUrl = productRecord[PRODUCTS.IMAGEURL],
-                supplierId = productRecord[PRODUCTS.SUPPLIERID],
-                density = productRecord[PRODUCTS.DENSITY]
-            )
-
-            val orderDetailRecord = record.into(ORDERDETAILS)
-            val orderDetail = OrderDetails(
-                quantity = orderDetailRecord[ORDERDETAILS.QUANTITY],
-                unitPrice = orderDetailRecord[ORDERDETAILS.UNITPRICE],
-                product = product
-            )
-
-            if (!orderDetailsMap.containsKey(orderId)) {
-                orderDetailsMap[orderId] = mutableListOf()
-            }
-            orderDetailsMap[orderId]?.add(orderDetail)
-
-            val logisticRecord = record.into(LOGISTICS)
-            val truckRecord = record.into(TRUCKS)
-            val courierRecord = record.into(COURIERS)
-
-            val truck = TruckFUllInfo(
-                truckId = truckRecord[TRUCKS.ID],
-                capacityLiters = truckRecord[TRUCKS.CAPACITY_LITERS],
-                productType = truckRecord[TRUCKS.PRODUCT_TYPE],
-                isAvailable = truckRecord[TRUCKS.IS_AVAILABLE],
-                warehouseId = truckRecord[TRUCKS.WAREHOUSE_ID],
-                courier = Courier(
-                    courierId = courierRecord[COURIERS.ID],
-                    name = courierRecord[COURIERS.NAME],
-                    phone = courierRecord[COURIERS.PHONE],
-                    email = courierRecord[COURIERS.EMAIL]
-                )
-            )
-
-            if (!logisticsMap.containsKey(orderId)) {
-                val logistic = Logistic(
-                    logisticId = logisticRecord[LOGISTICS.ID],
-                    orderId = logisticRecord[LOGISTICS.ORDER_ID],
-                    estimatedDeliveryDate = logisticRecord[LOGISTICS.ESTIMATED_DELIVERY_DATE].atStartOfDay(),
-                    address = logisticRecord[LOGISTICS.ADDRESS],
-                    recipientName = logisticRecord[LOGISTICS.RECIPIENT_NAME],
-                    recipientPhone = logisticRecord[LOGISTICS.RECIPIENT_PHONE],
-                    deliveryNotes = logisticRecord[LOGISTICS.DELIVERY_NOTES],
-                    warehouseId = logisticRecord[LOGISTICS.WAREHOUSE_ID],
-                    coordinates = logisticRecord[LOGISTICS.COORDINATES],
-                    status = logisticRecord[LOGISTICS.STATUS],
-                    trucks = mutableListOf(truck)
-                )
-                logisticsMap[orderId] = logistic
-            } else {
-                val trucks = logisticsMap[orderId]?.trucks?.map{ it.truckId } ?: emptyList()
-                if (!trucks.contains(truck.truckId)) {
-                    logisticsMap[orderId]?.trucks?.add(truck)
-                }
-            }
-        }
-
-        return ordersMap.map { (_, order) ->
-            val orderId = order.orderId
-            OrderFullInfo(
-                order = order,
-                orderDetails = orderDetailsMap[orderId] ?: emptyList(),
-                logistic = logisticsMap[orderId]
-            )
-        }
+        return getOrderFullInfo(order)
     }
 
     @Transactional(readOnly = true)
-    fun getOrderDetailsByOrderId(orderId: Int): OrderFullInfo? {
-        val result = dslContext
+    fun getAllOrdersByUserId(userId: Int): List<OrderFullInfo> {
+        val orders = dslContext
             .select()
             .from(ORDERS)
-            .innerJoin(ORDERDETAILS).on(ORDERS.ORDERID.eq(ORDERDETAILS.ORDERID))
-            .innerJoin(PRODUCTS).on(ORDERDETAILS.PRODUCTID.eq(PRODUCTS.PRODUCTID))
-            .innerJoin(LOGISTICS).on(ORDERS.ORDERID.eq(LOGISTICS.ORDER_ID))
-            .leftJoin(ORDER_TRUCKS).on(ORDERS.ORDERID.eq(ORDER_TRUCKS.ORDER_ID))
-            .leftJoin(TRUCKS).on(ORDER_TRUCKS.TRUCK_ID.eq(TRUCKS.ID))
-            .leftJoin(COURIERS).on(TRUCKS.COURIER_ID.eq(COURIERS.ID))
-            .where(ORDERS.ORDERID.eq(orderId))
+            .where(ORDERS.USERID.eq(userId))
             .fetch()
+            .map { convertToOrder(it) }
 
-        val ordersMap = mutableMapOf<Int, Order>()
-        val orderDetailsMap = mutableMapOf<Int, MutableList<OrderDetails>>()
-        val logisticsMap = mutableMapOf<Int, Logistic>()
 
-        result.forEach { record ->
-            val orderId = record[ORDERS.ORDERID]
 
-            if (!ordersMap.containsKey(orderId)) {
-                val orderRecord = record.into(ORDERS)
-                val order = Order(
-                    orderId = orderRecord[ORDERS.ORDERID],
-                    userId = orderRecord[ORDERS.USERID],
-                    orderDate = orderRecord[ORDERS.ORDERDATE].toLocalDate().toString(),
-                    totalPrice = orderRecord[ORDERS.TOTALPRICE],
-                    status = OrderStatus.valueOf(orderRecord[ORDERS.STATUS])
-                )
-                ordersMap[orderId] = order
-            }
-
-            val productRecord = record.into(PRODUCTS)
-            val product = Product(
-                productId = productRecord[PRODUCTS.PRODUCTID],
-                name = productRecord[PRODUCTS.NAME],
-                description = productRecord[PRODUCTS.DESCRIPTION],
-                price = productRecord[PRODUCTS.PRICE],
-                pricePerTon = productRecord[PRODUCTS.PRICEPERTON],
-                type = productRecord[PRODUCTS.TYPE],
-                imageUrl = productRecord[PRODUCTS.IMAGEURL],
-                supplierId = productRecord[PRODUCTS.SUPPLIERID],
-                density = productRecord[PRODUCTS.DENSITY]
-            )
-
-            val orderDetailRecord = record.into(ORDERDETAILS)
-            val orderDetail = OrderDetails(
-                quantity = orderDetailRecord[ORDERDETAILS.QUANTITY],
-                unitPrice = orderDetailRecord[ORDERDETAILS.UNITPRICE],
-                product = product
-            )
-
-            if (!orderDetailsMap.containsKey(orderId)) {
-                orderDetailsMap[orderId] = mutableListOf()
-            }
-            orderDetailsMap[orderId]?.add(orderDetail)
-
-            val logisticRecord = record.into(LOGISTICS)
-            val truckRecord = record.into(TRUCKS)
-            val courierRecord = record.into(COURIERS)
-
-            val truck = TruckFUllInfo(
-                truckId = truckRecord[TRUCKS.ID],
-                capacityLiters = truckRecord[TRUCKS.CAPACITY_LITERS],
-                productType = truckRecord[TRUCKS.PRODUCT_TYPE],
-                isAvailable = truckRecord[TRUCKS.IS_AVAILABLE],
-                warehouseId = truckRecord[TRUCKS.WAREHOUSE_ID],
-                courier = Courier(
-                    courierId = courierRecord[COURIERS.ID],
-                    name = courierRecord[COURIERS.NAME],
-                    phone = courierRecord[COURIERS.PHONE],
-                    email = courierRecord[COURIERS.EMAIL]
-                )
-            )
-
-            if (!logisticsMap.containsKey(orderId)) {
-                val logistic = Logistic(
-                    logisticId = logisticRecord[LOGISTICS.ID],
-                    orderId = logisticRecord[LOGISTICS.ORDER_ID],
-                    estimatedDeliveryDate = logisticRecord[LOGISTICS.ESTIMATED_DELIVERY_DATE].atStartOfDay(),
-                    address = logisticRecord[LOGISTICS.ADDRESS],
-                    recipientName = logisticRecord[LOGISTICS.RECIPIENT_NAME],
-                    recipientPhone = logisticRecord[LOGISTICS.RECIPIENT_PHONE],
-                    deliveryNotes = logisticRecord[LOGISTICS.DELIVERY_NOTES],
-                    warehouseId = logisticRecord[LOGISTICS.WAREHOUSE_ID],
-                    coordinates = logisticRecord[LOGISTICS.COORDINATES],
-                    status = logisticRecord[LOGISTICS.STATUS],
-                    trucks = mutableListOf(truck)
-                )
-                logisticsMap[orderId] = logistic
-            } else {
-                val trucks = logisticsMap[orderId]?.trucks?.map{ it.truckId } ?: emptyList()
-                if (!trucks.contains(truck.truckId)) {
-                    logisticsMap[orderId]?.trucks?.add(truck)
-                }
-            }
+        return orders.map { order ->
+            getOrderFullInfo(order)
         }
+    }
 
-        val order = orderDetailsMap.keys.firstOrNull()?.let { orderId ->
-            val orderRecord = result.first().into(ORDERS)
-            Order(
-                orderId = orderRecord[ORDERS.ORDERID],
-                userId = orderRecord[ORDERS.USERID],
-                orderDate = orderRecord[ORDERS.ORDERDATE].toLocalDate().toString(),
-                totalPrice = orderRecord[ORDERS.TOTALPRICE],
-                status = OrderStatus.valueOf(orderRecord[ORDERS.STATUS])
+    private fun getOrderFullInfo(order: Order): OrderFullInfo {
+        val orderId = order.orderId
+        val orderDetails = dslContext
+            .selectFrom(ORDERDETAILS)
+            .where(ORDERDETAILS.ORDERID.eq(orderId))
+            .fetch()
+            .map {
+                val productId = it.get(ORDERDETAILS.PRODUCTID)
+                val quantity = it.get(ORDERDETAILS.QUANTITY)
+                val unitPrice = it.get(ORDERDETAILS.UNITPRICE)
+                val product = productRepository.getProductById(productId)
+                val fullProduct = product.apply { supplier = productRepository.getSupplierById(product.supplierId) }
+                OrderDetails(
+                    quantity = quantity,
+                    unitPrice = unitPrice,
+                    product = fullProduct,
+                )
+            }
+        val logisticRecord = dslContext.selectFrom(LOGISTICS)
+            .where(LOGISTICS.ORDER_ID.eq(orderId))
+            .fetchOne()
+            ?: throw RuntimeException("Запись в таблице Logistics не может быть пустая для orderId = $orderId")
+        val trucks = truckRepository.getTrucksByOrderId(orderId)
+
+        val trucksFullInfo = trucks.map { truck ->
+            val courier = truckRepository.gatCourierById(truck.courierId)
+            TruckFUllInfo(
+                truckId = truck.id,
+                capacityLiters = truck.capacityLiters,
+                productType = truck.productType,
+                isAvailable = truck.isAvailable,
+                warehouseId = truck.warehouseId,
+                courier = courier,
             )
         }
 
-        return order?.let { OrderFullInfo(order = it, orderDetails = orderDetailsMap[orderId] ?: emptyList(), logistic = logisticsMap[orderId]) }
+        val warehouseId = logisticRecord.get(LOGISTICS.WAREHOUSE_ID)
+        val warehouse = warehouseRepository.getWarehouseById(warehouseId)
+
+        val logistic = Logistic(
+            logisticId = logisticRecord.get(LOGISTICS.ID),
+            orderId = orderId,
+            estimatedDeliveryDate = logisticRecord.get(LOGISTICS.ESTIMATED_DELIVERY_DATE).atStartOfDay(),
+            address = logisticRecord.get(LOGISTICS.ADDRESS),
+            recipientPhone = logisticRecord.get(LOGISTICS.RECIPIENT_PHONE),
+            recipientName = logisticRecord.get(LOGISTICS.RECIPIENT_NAME),
+            deliveryNotes = logisticRecord.get(LOGISTICS.DELIVERY_NOTES),
+            warehouse = warehouse,
+            coordinates = logisticRecord.get(LOGISTICS.COORDINATES),
+            status = logisticRecord.get(LOGISTICS.STATUS),
+            trucks = trucksFullInfo.toMutableList()
+        )
+
+        return OrderFullInfo(
+            order = order,
+            orderDetails = orderDetails,
+            logistic = logistic
+        )
     }
 }
 

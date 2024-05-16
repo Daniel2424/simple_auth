@@ -40,7 +40,7 @@ data class Logistic(
     val recipientName: String,
     val recipientPhone: String,
     val deliveryNotes: String,
-    val warehouseId: Int,
+    val warehouse: Warehouse,
     val coordinates: String,
     val status: String,
     val trucks: MutableList<TruckFUllInfo> = mutableListOf()

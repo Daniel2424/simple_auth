@@ -34,7 +34,7 @@ class SecurityConfig {
         return http
             .csrf { it.disable() }
             .authorizeHttpRequests {
-                it.requestMatchers("/graphql", "/gui").permitAll()
+                it.requestMatchers("/graphql", "/gui", "/download").permitAll()
                 it.anyRequest().authenticated()
             }
             .httpBasic(Customizer.withDefaults())
